@@ -13,7 +13,7 @@ namespace Poker
 
         private List<Card> cards = new List<Card>();
         private Ranks rank = Ranks.NotSet;
-
+        private List<int> values = new List<int>();
 
         static Hand()
         {
@@ -39,45 +39,46 @@ namespace Poker
 
         public Hand(string hand)
         {
-            foreach(var val in hand.Split(' '))
-            {
-                var parts = val.ToCharArray();
-                cards.Add(new Card(ValueToNumber[parts[0]], CharToSuit[parts[1]]));
-            }
+            FillCards(hand);
 
+            EvaluateHand();
+        }
+
+        private void EvaluateHand()
+        {
             var temp = new Dictionary<int, int>();
             var sameSuit = true;
             var compareSuit = cards[0].Suit;
-            foreach(var c in cards)
+            foreach (var c in cards)
             {
                 if (!temp.ContainsKey(c.Value)) temp.Add(c.Value, 0);
                 temp[c.Value]++;
                 if (c.Suit != compareSuit) sameSuit = false;
             }
-            var straight = true;
-            var keys = temp.Keys.ToList();
-            if (keys.Contains(2) && keys.Contains(14))
+
+            GetRank(temp, sameSuit);
+            FillValues(temp);
+        }
+
+        private void FillCards(string hand)
+        {
+            foreach (var val in hand.Split(' '))
             {
-                keys.Remove(14);
-                keys.Add(1);
+                var parts = val.ToCharArray();
+                cards.Add(new Card(ValueToNumber[parts[0]], CharToSuit[parts[1]]));
             }
-            keys.Sort();
-            var first = keys[0];
-            for(int ix = 1; ix < 5; ix++)
-            {
-                if (keys[ix] != first + 1)
-                {
-                    straight = false;
-                    break;
-                }
-                first = keys[ix];
-            }
+        }
+
+        private void GetRank(Dictionary<int, int> temp, bool sameSuit)
+        {
+            var straight = FindStraight(temp);
             var profile = temp.Values.ToList();
             profile.Sort();
             profile.Reverse();
             var result = string.Join("", profile.Select(p => p.ToString()).ToArray());
-            
-            switch(result)
+            var keys = temp.Keys.ToList();
+            keys.Sort();
+            switch (result)
             {
                 case "11111":
                     rank = Ranks.HighCard;
@@ -109,12 +110,77 @@ namespace Poker
             }
         }
 
-        public int Total()
+        private void FillValues(Dictionary<int, int> temp)
         {
-            return cards.Select(c => c.Value).Sum();            
+            var vals = temp.Keys.ToList();
+            vals.Sort();
+            vals.Reverse();
+            switch (rank)
+            {
+                case Ranks.HighCard:
+                case Ranks.Flush:
+                    values.AddRange(vals);
+                    break;
+                case Ranks.Pair:
+                case Ranks.ThreeOfAKind:
+                case Ranks.FourOfAKind:
+                    foreach (var val in vals) if (temp[val] != 1) values.Add(val);
+                    foreach (var val in vals) if (temp[val] == 1) values.Add(val);
+                    break;
+                case Ranks.Straight:
+                case Ranks.StraightFlush:
+                case Ranks.RoyalFlush:
+                    values.Add(vals[0]);
+                    break;
+                case Ranks.FullHouse:
+                    foreach (var val in vals) if (temp[val] == 3) values.Add(val);
+                    foreach (var val in vals) if (temp[val] == 2) values.Add(val);
+                    break;
+                case Ranks.TwoPairs:
+                    foreach (var val in vals) if (temp[val] == 2) values.Add(val);
+                    values.Sort();
+                    values.Reverse();
+                    foreach (var val in vals) if (temp[val] == 1) values.Add(val);
+                    break;
+            }
+        }
+
+        private static bool FindStraight(Dictionary<int, int> temp)
+        {
+            var keys = temp.Keys.ToList();
+            if (keys.Contains(2) && keys.Contains(14))
+            {
+                keys.Remove(14);
+                keys.Add(1);
+            }
+            keys.Sort();
+            var first = keys[0];
+            for (int ix = 1; ix < 5; ix++)
+            {
+                if (keys[ix] != first + 1)
+                {
+                    return false;
+                }
+                first = keys[ix];
+            }
+            return true;
         }
 
         public Ranks RankValue() => rank;
+
+        public Results GetResult(Hand other)
+        {
+            if (this.rank > other.rank) return Results.Win;
+            if (this.rank < other.rank) return Results.Loss;
+            var ix = 0;
+            while(ix < values.Count)
+            {
+                if (this.values[ix] > other.values[ix]) return Results.Win;
+                else if (this.values[ix] < other.values[ix]) return Results.Loss;
+                ix++;
+            }
+            return Results.Draw;
+        }
     }
     public class Card
     {
@@ -140,4 +206,5 @@ namespace Poker
                         FourOfAKind = 8,
                         StraightFlush = 9,
                         RoyalFlush = 10 }
+    public enum Results { Win, Loss, Draw }
 }

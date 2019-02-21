@@ -9,14 +9,6 @@ namespace Poker
 {
     public class TestHands
     {
-        [Fact]
-        public void Test()
-        {
-            var mock = new Hand("KS 2D 3H 4C TD");
-            Xunit.Assert.Equal(13 + 2 + 3 + 4 + 10, mock.Total());
-            Xunit.Assert.Equal(Ranks.HighCard, mock.RankValue());
-        }
-
         [Theory]
         [InlineData("AC 4H 7D KC 2S", Ranks.HighCard)]
         [InlineData("KC KH 7D 2C 5S", Ranks.Pair)]
@@ -34,5 +26,14 @@ namespace Poker
             var mock = new Hand(hand);
             Assert.Equal(rank,mock.RankValue());
         }
+
+        [Theory]
+        [InlineData("AC 4H 7D KC 2S", "AD 4D 8D KS 2H", Results.Loss)]
+        [InlineData("AD 4D 8D KS 2H", "AC 4H 7D KC 2S", Results.Win)]
+        [InlineData("AC 4H 7D KC 2S", "AC 4H 7D KC 2S", Results.Draw)]
+        [InlineData("TH JH QH KH AH", "AC 4H 7D KC 2S", Results.Win)]
+        [InlineData("TH JH QH KH AH", "TD JD QD KD AD", Results.Draw)]
+        public void TestResult(string hand, string other, Results result) => Assert.Equal(result, new Hand(hand).GetResult(new Hand(other)));
+
     }
 }
